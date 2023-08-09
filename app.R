@@ -4,13 +4,29 @@ library(DT)
 library(shinyWidgets)
 
 options(dplyr.summarise.inform = FALSE)
+options(digits=2)
 
 # Get ASE data into shiny app
-aseData <- readRDS("/projects/glchang_prj/finalPOGdata/allASEdata_anonymize.RDS") 
+aseData <- readRDS("/projects/glchang_prj/finalPOGdata/allASEdata_anonymize.RDS") %>%
+    dplyr::mutate(methylation = case_when(
+        methyl_state < 0 ~ "allele2Methyl",
+        TRUE ~ "allele1Methyl"
+    )) %>%
+    dplyr::mutate(expression = case_when(
+        allele1IsMajor ~ "alelle1Expression",
+        TRUE ~ "alelle2Expression"
+    )) %>%
+    dplyr::mutate(aseResult = case_when(
+        majorAlleleFrequency < 0.65 ~ "BAE",
+        majorAlleleFrequency >= 0.65 ~ "ASE"
+    )) %>%
+    dplyr::mutate(majorAlleleFrequency = format(round(majorAlleleFrequency, 3), nsmall = 3)) %>%
+    dplyr::mutate(padj = format(round(padj, 3), nsmall = 3))
+    
 pogSample <- c("All", unique(aseData$sample))
 defaultColumn <- c("gene", "majorAlleleFrequency", 
                    "padj", "aseResults", "sample")
-column <- setdiff(colnames(aseData), defaultColumn)
+column <- setdiff(colnames(aseData), c(defaultColumn, "methylation", "expression", "aseResult"))
 geneOfInterest <- readRDS("src/geneOfInterest.RDS")
 
 
@@ -126,7 +142,8 @@ ui <- fluidPage(
             checkboxGroupInput("significance", 
                                "Filter for significant genes", 
                                choices = list("Only Significant")),
-            
+            hr(),
+            downloadButton('downloadData', 'Download current table as csv')
         ),
         # Show a plot of the generated distribution
         mainPanel(
@@ -258,17 +275,14 @@ server <- function(input, output) {
     )
     
     output$general <- renderPlot(table() %>%
-                                     dplyr::mutate(aseResults = case_when(
-                                         majorAlleleFrequency < 0.65 ~ "BAE",
-                                         majorAlleleFrequency >= 0.65 ~ "ASE"
-                                     )) %>%
-                                     group_by(sample, aseResults) %>%
+                                     group_by(sample, aseResult) %>%
                                      summarize(n=n()) %>%
                                      dplyr::mutate(prop = n/sum(n)) %>%
-                                     ggplot(aes(aseResults, prop)) + 
+                                     ggplot(aes(aseResult, prop)) + 
                                      geom_boxplot() + 
                                      ggtitle("Proportion of ASE and BAE gene in each sample", 
-                                             subtitle = "Major Allele Frequency above 0.65 = ASE")
+                                             subtitle = "Major Allele Frequency above 0.65 = ASE") + 
+                                     xlab("aseResults")
     )
     
     output$density <- renderPlot(table() %>%
@@ -280,14 +294,6 @@ server <- function(input, output) {
     
     output$methyl <- renderPlot(table() %>%
                                 dplyr::filter(!is.na(methyl_state)) %>%
-                                dplyr::mutate(methylation = case_when(
-                                    methyl_state < 0 ~ "allele2Methyl",
-                                    TRUE ~ "allele1Methyl"
-                                )) %>%
-                                dplyr::mutate(expression = case_when(
-                                    allele1IsMajor ~ "alelle1Expression",
-                                    TRUE ~ "alelle2Expression"
-                                )) %>%
                                 dplyr::select(methylation, expression) %>%
                                 group_by(methylation, expression) %>%
                                 summarize(n=n()) %>%
@@ -305,6 +311,15 @@ server <- function(input, output) {
                                       axis.title.x=element_blank(), 
                                       axis.title.y=element_blank())  
                                 )
+    output$downloadData <- downloadHandler(
+        filename = function() {
+            paste('IMPALA-data-', Sys.Date(), '.csv', sep='')
+        },
+        content = function(file) {
+            write.csv(table(), file)
+        },
+        contentType = 'text/csv'
+    )
 }
 
 # Run the application 
