@@ -6,7 +6,7 @@ library(shinyWidgets)
 options(dplyr.summarise.inform = FALSE)
 
 # Get ASE data into shiny app
-aseData <- readRDS("/projects/glchang_prj/finalPOGdata/allASEdata.RDS") 
+aseData <- readRDS("/projects/glchang_prj/finalPOGdata/allASEdata_anonymize.RDS") 
 pogSample <- c("All", unique(aseData$sample))
 defaultColumn <- c("gene", "majorAlleleFrequency", 
                    "padj", "aseResults", "sample")
@@ -16,18 +16,25 @@ geneOfInterest <- readRDS("src/geneOfInterest.RDS")
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-    
+   
     # Application title
-    titlePanel("ASE data for Long POG cohort"),
-    hr(),
-    h5("This shiny app is used to explore Allele Specific Expression (ASE) data 
+    div(
+        style={'padding: 15px'},
+        img(src = "impala_logo.svg", align = "right", width = 150, height = 150),
+        titlePanel("ASE data for Long POG cohort"),
+        
+        h5("This shiny app is used to explore Allele Specific Expression (ASE) data 
        from the Long POG cohort. Using Oxford Nanopore long reads for genome phasing 
        and Illumina RNA-seq data, the ", a("IMPALA pipeline", href="https://github.com/bcgsc/IMPALA/tree/master"),
-       " was used to call ASE data in 174 cancer samples. Genes are annotated with 
+           " was used to call ASE data in 174 cancer samples. Genes are annotated with 
        allelic CNV data, allelic methylation and nonsense mutation to explain the mechanism of ASE"),
-    br(),
-    sidebarLayout(
+        hr(),
+        br(),
+    
+    
+    fluidRow(
         sidebarPanel(
+            width = 3,
             # Show number of ASE genes
             h4(textOutput("aseNum")),
             hr(),
@@ -70,7 +77,7 @@ ui <- fluidPage(
             
             # Filter for gene type
             pickerInput("GeneOfInterest", 
-                       "Filter for special types of genes", 
+                       "Special types of genes", 
                        choices = list("Chromosome X genes" = "chrX", 
                                       "Imprinting genes" = "imprinting", 
                                       "Olfactory genes" = "olfactory",
@@ -142,6 +149,7 @@ ui <- fluidPage(
                         )
         )
     )
+)
 )
 
 # Define server logic required to draw a histogram
@@ -225,8 +233,6 @@ server <- function(input, output) {
             tbl <- tbl %>%
                 dplyr::filter(somaticIndel)
         } 
-        
-        
         
         tbl
     })
