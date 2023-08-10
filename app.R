@@ -286,6 +286,7 @@ server <- function(input, output) {
     )
     
     output$density <- renderPlot(table() %>%
+                                     dplyr::mutate(majorAlleleFrequency = as.numeric(majorAlleleFrequency)) %>%
                                      ggplot(aes(majorAlleleFrequency)) + 
                                      geom_density() +
                                      geom_vline(xintercept = 0.65) +
